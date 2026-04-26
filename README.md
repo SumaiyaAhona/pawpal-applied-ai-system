@@ -1,92 +1,236 @@
-# PawPal+ (Module 2 Project)
+# PawPal+ Intelligent Pet Care Assistant
 
-You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
+A Streamlit-based pet care management app enhanced with AI-powered natural language assistance, emergency guardrails, and smart daily scheduling.
 
-## Scenario
+---
 
-A busy pet owner needs help staying consistent with pet care. They want an assistant that can:
+## Original Base Project
 
-- Track pet care tasks (walks, feeding, meds, enrichment, grooming, etc.)
-- Consider constraints (time available, priority, owner preferences)
-- Produce a daily plan and explain why it chose that plan
+PawPal+ began as a Module 2 project focused on helping pet owners plan and track daily care tasks. The original app introduced the core data model — `Owner`, `Pet`, `Task`, and `Scheduler` — and demonstrated priority-based scheduling, conflict detection, and recurring task support through a simple Streamlit interface. It established the foundation that the final project builds directly on top of.
 
-Your job is to design the system first (UML), then implement the logic in Python, then connect it to the Streamlit UI.
+---
 
-## What you will build
+## Final Project Summary
 
-Your final app should:
+For the final project, PawPal+ was upgraded from a basic task tracker into an intelligent pet care assistant. New capabilities include a personalized owner settings panel, multi-pet management, a smart daily schedule generator, and a natural language assistant that classifies pet-care questions, delivers category-specific recommendations, and surfaces emergency warnings when dangerous keywords are detected.
 
-- Let a user enter basic owner + pet info
-- Let a user add/edit tasks (duration + priority at minimum)
-- Generate a daily schedule/plan based on constraints and priorities
-- Display the plan clearly (and ideally explain the reasoning)
-- Include tests for the most important scheduling behaviors
+The result is a single-page Streamlit app that takes a pet owner from initial setup through daily schedule generation — with a conversational AI layer available at any step.
 
-## Getting started
+![PawPal+ App Screenshot](assets/pawpal_demo.png)
 
-### Setup
+---
+
+## Why This Project Matters
+
+Pet care is easy to deprioritize when life gets busy. A busy owner managing multiple pets, variable schedules, and a limited budget needs a tool that does more than store a list — it needs to reason about constraints and flag problems before they become emergencies.
+
+PawPal+ demonstrates how a small, well-structured Python application can deliver real value: it respects the owner's available time, surfaces scheduling conflicts, and acts as a safety net by steering users toward a veterinarian when their input suggests a medical crisis.
+
+---
+
+## Key Features
+
+| Feature | Description |
+|---|---|
+| **Owner Settings Sidebar** | Set first name, last name, available minutes per day, and max daily budget. Persists across the session. |
+| **Multi-Pet Management** | Add any number of pets with name and species. View and manage each pet independently. |
+| **Task Management** | Add tasks with title, duration, priority (low / medium / high), repeat frequency, and pet assignment. |
+| **Your Pets Dashboard** | Select a pet from a dropdown to view its tasks. Remove individual tasks with one click. |
+| **Generate Daily Schedule** | Sorts all tasks by priority, checks total duration against available minutes, and runs conflict detection — all in one button click. |
+| **Smart PawPal+ Assistant** | Accepts free-text pet-care questions. Classifies input into feeding, grooming, exercise, scheduling, or general care, then returns a targeted tip and suggested task. |
+| **Emergency Guardrails** | Detects keywords like *chocolate*, *poison*, *seizure*, and *bleeding* and immediately displays a high-visibility warning with ASPCA Poison Control contact information. |
+
+---
+
+## Architecture Overview
+
+```
+pawpal-ai-final/
+├── app.py                  # Streamlit UI — all sections and user interactions
+├── pawpal_system.py        # Core logic: Owner, Pet, Task, Scheduler classes
+├── tests/
+│   └── test_pawpal.py      # pytest test suite
+├── assets/
+│   ├── pawpal_system_diagram_final.png
+│   └── pawpal_demo.png
+└── requirements.txt
+```
+
+**System diagram:**
+
+<a href="assets/pawpal_system_diagram_final.png" target="_blank">
+  <img src="assets/pawpal_system_diagram_final.png" alt="PawPal+ System Diagram" width="600" />
+</a>
+
+### Data flow
+
+1. The user configures owner settings in the sidebar → stored in `st.session_state`.
+2. Pets are added to `st.session_state.owner` (an `Owner` object backed by a `Scheduler`).
+3. Tasks are added to both `st.session_state.tasks` (a list of display dicts) and to the `Pet` object via `owner.schedule_task()`.
+4. The schedule generator reads from `st.session_state.tasks`, sorts by priority, compares total duration against `available_minutes`, and calls `scheduler.detect_conflicts()` per pet.
+5. The assistant reads the raw text input, runs keyword classification, and returns a response — no external API calls required.
+
+### Key classes (`pawpal_system.py`)
+
+- **`Task`** — holds title, time, priority, duration, frequency, and status. Supports recurring task generation on completion.
+- **`Pet`** — stores a name, species, and list of `Task` objects.
+- **`Owner`** — holds owner name, a list of pets, and a reference to the shared `Scheduler`.
+- **`Scheduler`** — provides `sort_by_time()`, `filter_tasks()`, `detect_conflicts()`, and `get_conflict_pairs()`.
+
+---
+
+## Setup Instructions
+
+**Prerequisites:** Python 3.9 or higher.
 
 ```bash
+# 1. Clone the repository
+git clone https://github.com/SumaiyaAhona/pawpal-ai-final.git
+cd pawpal-ai-final
+
+# 2. Create and activate a virtual environment
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate        # macOS / Linux
+# .venv\Scripts\activate         # Windows
+
+# 3. Install dependencies
 pip install -r requirements.txt
 ```
 
-### Suggested workflow
+---
 
-1. Read the scenario carefully and identify requirements and edge cases.
-2. Draft a UML diagram (classes, attributes, methods, relationships).
-3. Convert UML into Python class stubs (no logic yet).
-4. Implement scheduling logic in small increments.
-5. Add tests to verify key behaviors.
-6. Connect your logic to the Streamlit UI in `app.py`.
-7. Refine UML so it matches what you actually built.
-
-### System Architecture (UML)
-Here is the final UML diagram for PawPal+, showing classes, methods, and relationships:
-
-<a href="uml_final.png" target="_blank">
-  <img src="uml_final.png" title="PawPal+ UML Diagram" alt="UML Diagram" width="600" />
-</a>
-
-## 📸 Demo
-This is what the final PawPal+ app looks like in the browser:
-
-<a href="pawpal_demo.png" target="_blank">
-  <img src="pawpal_demo.png" title="PawPal+ Demo" alt="PawPal+ Demo" width="600" />
-</a>
-
-## Smarter Scheduling
-
-The `Scheduler` class includes several methods that go beyond basic task storage:
-
-- **`sort_by_time(pet=None)`** — Returns tasks sorted by start time. Pass a `Pet` to sort only that pet's tasks; omit it to sort across all pets.
-
-- **`filter_tasks(pet=None, status=None)`** — Filters tasks by pet, status, or both. For example, retrieve only `"pending"` tasks for a specific pet, or all `"completed"` tasks across every pet.
-
-- **`detect_conflicts(pet)`** — Returns a flat list of tasks that overlap in time for a given pet. A conflict occurs when one task starts before the previous one ends.
-
-- **`get_conflict_pairs(pet)`** — Returns overlapping tasks as `(task_a, task_b)` tuples so you know exactly which two tasks clash. Returns an empty list if the pet has no tasks or isn't registered.
-
-The `Task` class also supports **recurring tasks** via an optional `frequency` field (`"daily"` or `"weekly"`). When a recurring task is marked completed, `update_status("completed")` automatically returns a new `Task` scheduled for the next occurrence — ready to be added back to the pet's schedule.
-
-## Testing PawPal+
-
-Run the test suite with:
+## How to Run the App
 
 ```bash
-pytest tests/
+streamlit run app.py
 ```
 
-To see detailed output for each test:
+The app opens at `http://localhost:8501` in your browser.
+
+To run the test suite:
 
 ```bash
 pytest tests/ -v
 ```
 
-The test suite covers:
+---
 
-- **Sorting** — tasks returned in correct time order, single-pet scoping
-- **Recurring tasks** — daily/weekly offsets, non-recurring returns `None`, new task starts as `"pending"`
-- **Conflict detection** — overlapping tasks flagged, conflict pairs returned as tuples, no cross-pet false positives
-- **Edge cases** — empty pets and unregistered pets return `[]` without crashing
+## Sample Interactions
+
+### 1. Daily schedule fits within available time
+
+> Owner sets available minutes to **90** in the sidebar. Three tasks are added: Morning Walk (30 min, high), Evening Feeding (15 min, medium), Weekly Brushing (20 min, low).
+
+**Output:**
+```
+✅ Schedule fits! Total: 65 min of your 90 min available.
+
+Today's Schedule (high priority first)
+| Task            | Pet   | Duration (min) | Priority |
+|-----------------|-------|----------------|----------|
+| Morning Walk    | Mochi | 30             | high     |
+| Evening Feeding | Mochi | 15             | medium   |
+| Weekly Brushing | Mochi | 20             | low      |
+```
+
+---
+
+### 2. Schedule exceeds available time
+
+> Owner has **45 minutes** available. Same three tasks total **65 minutes**.
+
+**Output:**
+```
+⚠️ Total task time is 65 min but you only have 45 min/day available.
+Consider removing or shortening some tasks.
+```
+
+---
+
+### 3. Emergency keyword detected in the assistant
+
+> User types: *"My dog ate some chocolate, what should I do?"*
+
+**Output:**
+```
+🚨 Emergency detected!
+
+Your message contains keywords that may indicate a medical emergency.
+Contact your veterinarian or an emergency animal clinic immediately.
+
+You can also call the ASPCA Animal Poison Control Center: 1-888-426-4435
+```
+
+---
+
+## Design Decisions and Trade-offs
+
+**Rule-based AI over an external LLM**
+The assistant uses keyword matching rather than an API call to a large language model. This keeps the app self-contained, free to run, and easy to explain in a presentation. The trade-off is that phrasing variations can slip past detection — a limitation acknowledged as a future improvement.
+
+**`st.session_state` as the single source of truth for the UI**
+Task data is stored in both the `Pet` objects (for the `Scheduler`) and in `st.session_state.tasks` (for display). This duplication simplifies the UI code at the cost of keeping two lists in sync. For a production app, a single data store with a query layer would be preferable.
+
+**Flat task list instead of a database**
+All tasks live in memory for the duration of the session. This is appropriate for a demo and keeps the stack simple (no database dependency), but means data is lost on page refresh.
+
+**Emergency guardrails as the first classification check**
+The assistant always checks for emergency keywords before any category classification. This ordering ensures safety-critical responses are never overridden by a more specific but less urgent category match.
+
+---
+
+## Testing Summary
+
+The test suite covers the core scheduling logic in `pawpal_system.py`:
+
+| Area | What is tested |
+|---|---|
+| Sorting | Tasks returned in correct time order; single-pet scoping works |
+| Recurring tasks | Daily and weekly offsets produce correct next dates; non-recurring returns `None`; new task starts as `"pending"` |
+| Conflict detection | Overlapping tasks are flagged; `get_conflict_pairs()` returns correct tuples; no cross-pet false positives |
+| Edge cases | Empty pet lists and unregistered pets return `[]` without raising exceptions |
+
+Run with:
+
+```bash
+pytest tests/ -v
+```
+
+---
+
+## Reflection
+
+The biggest technical challenge was keeping the `Scheduler` object and `st.session_state.tasks` in sync after tasks are removed through the UI. Solving this required tracking the original list index through the filter so the remove button always deletes the correct entry.
+
+The most valuable design lesson was the importance of classifying input *before* displaying anything. Adding the emergency check as the first branch of the classifier — rather than an afterthought — made the guardrail reliable and easy to reason about.
+
+If I were starting over, I would use a single canonical task store (even a simple JSON file) instead of parallel data structures. That would eliminate the sync problem entirely.
+
+---
+
+## Future Improvements
+
+- **Persistent storage** — save pets, tasks, and owner settings to a local JSON file or SQLite database so data survives a page refresh.
+- **LLM integration** — replace keyword matching with a Claude or GPT API call for richer, more flexible natural language understanding.
+- **Cost tracking** — use the `daily_budget` field from owner settings to flag when scheduled tasks exceed the owner's spending limit.
+- **Task editing** — allow the owner to update an existing task's title, duration, or priority in place.
+- **Mobile-friendly layout** — adjust column widths and font sizes so the app is usable on a phone.
+- **Vet locator** — when an emergency is detected, surface a link to the nearest emergency vet using the owner's zip code.
+
+---
+
+## Loom Demo
+
+[Watch the demo walkthrough](#) ← *Replace this link with your Loom URL before submitting*
+
+---
+
+## Portfolio Statement
+
+PawPal+ demonstrates my ability to design a multi-class Python system from a UML diagram, implement it with test coverage, and surface it through a polished Streamlit interface. The final project extends the original scope with session-aware state management, a rule-based AI classifier, and safety guardrails — showing that I can ship features responsibly, not just functionally.
+
+Built with **Python** and **Streamlit**.
+
+---
+
+*PawPal+ — CodePath Final Project*

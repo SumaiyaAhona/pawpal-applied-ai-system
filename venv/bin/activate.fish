@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV /home/ahona/Codepath/ai110-module2show-pawpal-starter/venv
+set -gx VIRTUAL_ENV /home/ahona/Codepath/pawpal-ai-final/venv
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/"bin $PATH
