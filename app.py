@@ -21,6 +21,9 @@ if "owner" not in st.session_state:
     st.session_state.owner = Owner("Jordan", Scheduler())
 if "tasks" not in st.session_state:
     st.session_state.tasks = []
+# Stores age and gender per pet (Pet class only holds name and type)
+if "pet_details" not in st.session_state:
+    st.session_state.pet_details = {}
 
 # Default values for Owner Settings (stored so they survive reruns)
 if "owner_first_name" not in st.session_state:
@@ -69,31 +72,48 @@ with st.sidebar:
     st.write(f"**Time available:** {st.session_state.available_minutes} min/day")
     st.write(f"**Daily budget:** ${st.session_state.daily_budget:.2f}")
 
-# --- Add Pet Section ---
-st.subheader("Add a Pet")
-owner_name = st.text_input("Owner name", value=st.session_state.owner.name)
-pet_name = st.text_input("Pet name", value="Mochi")
-species = st.selectbox("Species", ["dog", "cat", "other"])
+# --- Add a Pet Section ---
+with st.expander("Add a Pet", expanded=not st.session_state.owner.pets):
+    new_pet_name = st.text_input("Pet name", placeholder="e.g. Mochi")
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        new_species = st.selectbox("Species", ["dog", "cat", "other"])
+    with col_b:
+        new_age = st.number_input("Age (years)", min_value=0, max_value=30, value=1)
+    with col_c:
+        new_gender = st.selectbox("Gender", ["female", "male", "unknown"])
 
-if st.button("Add pet"):
-    if pet_name:
-        st.session_state.owner.add_pet(Pet(pet_name, species))
-        st.success(f"Pet '{pet_name}' added!")
-    else:
-        st.warning("Enter a pet name!")
+    if st.button("Add pet"):
+        name = new_pet_name.strip()
+        if not name:
+            st.warning("Enter a pet name!")
+        elif any(p.name == name for p in st.session_state.owner.pets):
+            st.warning(f"A pet named '{name}' is already added!")
+        else:
+            st.session_state.owner.add_pet(Pet(name, new_species))
+            st.session_state.pet_details[name] = {"age": new_age, "gender": new_gender}
+            st.success(f"Pet '{name}' added!")
 
 # --- Your Pets Section ---
 st.subheader("Your Pets")
 
 if not st.session_state.owner.pets:
-    st.info("No pets added yet. Use the form above to add one.")
+    st.info("No pets added yet. Open 'Add a Pet' above to get started.")
+    selected_pet = None
 else:
-    # Build a list of names for the dropdown
     pet_names = [p.name for p in st.session_state.owner.pets]
-    selected_pet = st.selectbox("Select a pet to view its tasks", pet_names)
+    selected_pet = st.selectbox("Select a pet", pet_names, key="selected_pet")
 
-    # Collect tasks that belong to the selected pet, keeping the original index
-    # so the Remove button can delete the right item from st.session_state.tasks
+    # Show a one-line summary of the selected pet's details
+    pet_obj = next(p for p in st.session_state.owner.pets if p.name == selected_pet)
+    details = st.session_state.pet_details.get(selected_pet, {})
+    st.caption(
+        f"Species: {pet_obj.type} | "
+        f"Age: {details.get('age', '?')} yr | "
+        f"Gender: {details.get('gender', 'unknown')}"
+    )
+
+    # Show tasks belonging to the selected pet
     pet_tasks = [
         (i, task)
         for i, task in enumerate(st.session_state.tasks)
@@ -107,73 +127,101 @@ else:
         for original_index, task in pet_tasks:
             col_info, col_btn = st.columns([5, 1])
             with col_info:
+                time_str = f"{task.get('hour', 12)}:{task.get('minute', 0):02d} {task.get('am_pm', 'AM')}"
+                cost_str = f"${task.get('cost', 0.0):.2f}"
                 st.markdown(
                     f"**{task['title']}** &nbsp;|&nbsp; "
+                    f"Category: {task.get('category', 'general')} &nbsp;|&nbsp; "
+                    f"Time: {time_str} &nbsp;|&nbsp; "
                     f"{task['duration_minutes']} min &nbsp;|&nbsp; "
                     f"Priority: **{task['priority']}** &nbsp;|&nbsp; "
                     f"Repeat: {task['repeat']} &nbsp;|&nbsp; "
-                    f"Pet: {task['pet']}"
+                    f"Cost: {cost_str}"
                 )
             with col_btn:
-                # Use original_index as the key so each button is unique
                 if st.button("Remove", key=f"remove_{original_index}"):
                     st.session_state.tasks.pop(original_index)
                     st.rerun()
 
-# --- Add Task Section ---
-st.subheader("Add a Task")
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    task_title = st.text_input("Task title", value="Morning walk")
-with col2:
-    duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
-with col3:
-    priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
-with col4:
-    frequency = st.selectbox("Repeat", ["none", "daily", "weekly"])
+# --- Add a Task for Selected Pet Section ---
+st.subheader("Add a Task for Selected Pet")
 
-if st.button("Add task"):
-    if not st.session_state.owner.pets:
-        st.warning("Add a pet first!")
-    else:
-        pet = next((p for p in st.session_state.owner.pets if p.name == pet_name), None)
-        if pet:
-            task = Task(
-                task_title,
-                datetime.now(),
-                priority,
-                int(duration),
-                frequency=frequency if frequency != "none" else None
-            )
-            st.session_state.owner.schedule_task(pet, task)
-            st.session_state.tasks.append({
-                "title": task_title,
-                "duration_minutes": int(duration),
-                "priority": priority,
-                "repeat": frequency,
-                "pet": pet.name
-            })
-            st.success(f"Task '{task_title}' added to {pet.name}!")
-        else:
-            st.warning(f"No pet named '{pet_name}' found!")
-
-# --- Show Current Tasks ---
-st.markdown("### Current Tasks")
-if st.session_state.tasks:
-    st.table(st.session_state.tasks)
+if not st.session_state.owner.pets:
+    st.info("Add a pet above before creating tasks.")
+elif selected_pet is None:
+    st.info("Select a pet in 'Your Pets' above to add tasks.")
 else:
-    st.info("No tasks yet. Add one above.")
+    st.caption(f"Adding task to: **{selected_pet}**")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        task_title = st.text_input("Task name", placeholder="e.g. Morning walk")
+    with col2:
+        category = st.selectbox(
+            "Category",
+            ["feeding", "exercise", "grooming", "medication", "vet", "enrichment", "other"]
+        )
+
+    col3, col4, col5, col6 = st.columns(4)
+    with col3:
+        task_hour = st.number_input("Hour", min_value=1, max_value=12, value=8)
+    with col4:
+        task_minute = st.number_input("Minute", min_value=0, max_value=59, value=0, step=5)
+    with col5:
+        am_pm = st.selectbox("AM / PM", ["AM", "PM"])
+    with col6:
+        priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
+
+    col7, col8, col9 = st.columns(3)
+    with col7:
+        duration = st.number_input("Duration (min)", min_value=1, max_value=480, value=20)
+    with col8:
+        cost = st.number_input("Cost ($)", min_value=0.0, step=0.50, value=0.0)
+    with col9:
+        frequency = st.selectbox("Repeat", ["none", "daily", "weekly"])
+
+    if st.button("Add task"):
+        if not task_title.strip():
+            st.warning("Enter a task name!")
+        else:
+            pet = next((p for p in st.session_state.owner.pets if p.name == selected_pet), None)
+            if pet:
+                # Convert 12-hour time to 24-hour for the Task datetime
+                hour_24 = task_hour % 12 + (12 if am_pm == "PM" else 0)
+                task_time = datetime.now().replace(
+                    hour=hour_24, minute=task_minute, second=0, microsecond=0
+                )
+                task_obj = Task(
+                    task_title.strip(),
+                    task_time,
+                    priority,
+                    int(duration),
+                    frequency=frequency if frequency != "none" else None,
+                )
+                st.session_state.owner.schedule_task(pet, task_obj)
+                st.session_state.tasks.append({
+                    "title":            task_title.strip(),
+                    "category":         category,
+                    "hour":             task_hour,
+                    "minute":           task_minute,
+                    "am_pm":            am_pm,
+                    "duration_minutes": int(duration),
+                    "priority":         priority,
+                    "repeat":           frequency,
+                    "cost":             float(cost),
+                    "pet":              pet.name,
+                })
+                st.success(f"Task '{task_title.strip()}' added to {pet.name}!")
 
 # --- Generate Daily Schedule Section ---
 st.divider()
 st.subheader("Generate Daily Schedule")
-st.caption("Tasks sorted by priority, checked against your available time, with conflict detection.")
+st.caption("Tasks sorted by priority, checked against available time and daily budget, with conflict detection.")
 
 if st.button("Generate daily schedule"):
     if not st.session_state.tasks:
         st.warning("No tasks added yet. Add some tasks above first.")
     else:
-        # Priority order: high tasks go first, then medium, then low
         PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
         sorted_tasks = sorted(
@@ -181,45 +229,64 @@ if st.button("Generate daily schedule"):
             key=lambda t: PRIORITY_ORDER.get(t["priority"], 3)
         )
 
-        # Total minutes needed for all tasks
+        # --- Time check ---
         total_minutes = sum(t["duration_minutes"] for t in sorted_tasks)
-
-        # Read the owner's available minutes (set in the sidebar; default 60)
         available = st.session_state.get("available_minutes", 60)
 
-        # Warn the owner if the schedule is too packed
         if total_minutes > available:
             st.warning(
-                f"Total task time is **{total_minutes} min** but you only have "
+                f"⏱ Total task time is **{total_minutes} min** but you only have "
                 f"**{available} min/day** available. Consider removing or shortening some tasks."
             )
         else:
             st.success(
-                f"Schedule fits! Total: **{total_minutes} min** of your **{available} min** available."
+                f"⏱ Schedule fits! Total: **{total_minutes} min** of your **{available} min** available."
             )
 
-        # Show the ordered schedule as a table
+        # --- Cost check ---
+        total_cost = sum(t.get("cost", 0.0) for t in sorted_tasks)
+        budget = st.session_state.get("daily_budget", 10.0)
+
+        st.markdown(f"**Total estimated daily cost: ${total_cost:.2f}**")
+        if total_cost > budget:
+            st.warning(
+                f"💰 Total cost **${total_cost:.2f}** exceeds your daily budget of **${budget:.2f}**."
+            )
+        else:
+            st.success(
+                f"💰 Total cost **${total_cost:.2f}** is within your daily budget of **${budget:.2f}**."
+            )
+
+        # --- Schedule table ---
         st.markdown("#### Today's Schedule (high priority first)")
         schedule_rows = []
         for task in sorted_tasks:
+            time_str = f"{task.get('hour', 12)}:{task.get('minute', 0):02d} {task.get('am_pm', 'AM')}"
             schedule_rows.append({
-                "Task": task["title"],
-                "Pet": task["pet"],
+                "Pet":            task["pet"],
+                "Task":           task["title"],
+                "Category":       task.get("category", "general"),
+                "Time":           time_str,
                 "Duration (min)": task["duration_minutes"],
-                "Priority": task["priority"],
+                "Priority":       task["priority"],
+                "Repeat":         task["repeat"],
+                "Cost":           f"${task.get('cost', 0.0):.2f}",
             })
         st.table(schedule_rows)
 
-        # --- Conflict detection (merged from old Advanced Schedule Builder) ---
-        # Use the Scheduler object to check for overlapping tasks per pet
+        # --- Conflict detection ---
         scheduler = st.session_state.owner.scheduler
+        any_conflict = False
         for pet in st.session_state.owner.pets:
             conflicts = scheduler.detect_conflicts(pet)
             if conflicts:
+                any_conflict = True
                 conflict_names = ", ".join(t.title for t in conflicts)
                 st.warning(f"⚠ Conflict detected for **{pet.name}**: {conflict_names}")
+        if not any_conflict and st.session_state.owner.pets:
+            st.success("No scheduling conflicts detected.")
 
-        # --- Recurring task queuing (merged from old Advanced Schedule Builder) ---
+        # --- Recurring task queuing ---
         # If a completed task repeats daily or weekly, queue its next occurrence
         for pet in st.session_state.owner.pets:
             for task in scheduler.sort_by_time(pet=pet):
@@ -230,7 +297,7 @@ if st.button("Generate daily schedule"):
                         task.time + delta,
                         task.priority,
                         task.duration,
-                        frequency=task.frequency
+                        frequency=task.frequency,
                     )
                     pet.add_task(next_task)
                     st.info(
