@@ -231,7 +231,7 @@ If I were starting over, I would use a single canonical task store (even a simpl
 
 ## Loom Demo
 
-[Watch the demo walkthrough](#) ← *Replace this link with your Loom URL before submitting*
+[Watch the demo walkthrough](https://www.loom.com/share/c3ae27b2cc0c465a99d99b5000e78ffe) ← 
 
 ---
 
